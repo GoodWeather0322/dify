@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+pydantic
+python-jose[cryptography]
+langchain-google-genai
+langchain-postgres
+psycopg[binary]
+python-dotenv

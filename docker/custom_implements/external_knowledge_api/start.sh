@@ -1,0 +1,1 @@
+uvicorn external_konwledge_fastapi:app --host 0.0.0.0 --port 8181 --reload
