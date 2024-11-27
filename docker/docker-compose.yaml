@@ -289,6 +289,27 @@ x-shared-env: &shared-api-worker-env
   CREATE_TIDB_SERVICE_JOB_ENABLED: ${CREATE_TIDB_SERVICE_JOB_ENABLED:-false}
 
 services:
+
+  # external-knowledge-api
+  external-knowledge-api:
+    build:
+      context: ./custom_implements/external_knowledge_api
+      dockerfile: Dockerfile
+    # environment:
+    #   - POSTGRES_HOST=postgres
+    #   - POSTGRES_PORT=5432
+    #   - POSTGRES_USER=postgres
+    #   - POSTGRES_PASSWORD=difyai123456
+    #   - POSTGRES_DB=dify
+    #   - GOOGLE_API_KEY=AIzaSyCVfVE6tHn0C-bqhmczReQvM6EWOL_uDrc
+    ports:
+      - "8181:8000"
+    depends_on:
+      - pgvector
+    networks:
+      - ssrf_proxy_network
+      - default
+  
   # API service
   api:
     image: langgenius/dify-api:0.12.1
@@ -363,6 +384,19 @@ services:
       timeout: 3s
       retries: 30
 
+  pgadmin:
+    image: dpage/pgadmin4
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5680:80"
+    depends_on:
+      - db
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
   # The redis cache.
   redis:
     image: redis:6-alpine
@@ -427,23 +461,23 @@ services:
 
   # Certbot service
   # use `docker-compose --profile certbot up` to start the certbot service.
-  certbot:
-    image: certbot/certbot
-    profiles:
-      - certbot
-    volumes:
-      - ./volumes/certbot/conf:/etc/letsencrypt
-      - ./volumes/certbot/www:/var/www/html
-      - ./volumes/certbot/logs:/var/log/letsencrypt
-      - ./volumes/certbot/conf/live:/etc/letsencrypt/live
-      - ./certbot/update-cert.template.txt:/update-cert.template.txt
-      - ./certbot/docker-entrypoint.sh:/docker-entrypoint.sh
-    environment:
-      - CERTBOT_EMAIL=${CERTBOT_EMAIL}
-      - CERTBOT_DOMAIN=${CERTBOT_DOMAIN}
-      - CERTBOT_OPTIONS=${CERTBOT_OPTIONS:-}
-    entrypoint: ['/docker-entrypoint.sh']
-    command: ['tail', '-f', '/dev/null']
+  # certbot:
+  #   image: certbot/certbot
+  #   profiles:
+  #     - certbot
+  #   volumes:
+  #     - ./volumes/certbot/conf:/etc/letsencrypt
+  #     - ./volumes/certbot/www:/var/www/html
+  #     - ./volumes/certbot/logs:/var/log/letsencrypt
+  #     - ./volumes/certbot/conf/live:/etc/letsencrypt/live
+  #     - ./certbot/update-cert.template.txt:/update-cert.template.txt
+  #     - ./certbot/docker-entrypoint.sh:/docker-entrypoint.sh
+  #   environment:
+  #     - CERTBOT_EMAIL=${CERTBOT_EMAIL}
+  #     - CERTBOT_DOMAIN=${CERTBOT_DOMAIN}
+  #     - CERTBOT_OPTIONS=${CERTBOT_OPTIONS:-}
+  #   entrypoint: ['/docker-entrypoint.sh']
+  #   command: ['tail', '-f', '/dev/null']
 
   # The nginx reverse proxy.
   # used for reverse proxying the API service and Web service.
@@ -456,10 +490,10 @@ services:
       - ./nginx/https.conf.template:/etc/nginx/https.conf.template
       - ./nginx/conf.d:/etc/nginx/conf.d
       - ./nginx/docker-entrypoint.sh:/docker-entrypoint-mount.sh
-      - ./nginx/ssl:/etc/ssl # cert dir (legacy)
-      - ./volumes/certbot/conf/live:/etc/letsencrypt/live # cert dir (with certbot container)
-      - ./volumes/certbot/conf:/etc/letsencrypt
-      - ./volumes/certbot/www:/var/www/html
+      # - ./nginx/ssl:/etc/ssl # cert dir (legacy)
+      # - ./volumes/certbot/conf/live:/etc/letsencrypt/live # cert dir (with certbot container)
+      # - ./volumes/certbot/conf:/etc/letsencrypt
+      # - ./volumes/certbot/www:/var/www/html
     entrypoint:
       [
         'sh',
@@ -469,26 +503,26 @@ services:
     environment:
       NGINX_SERVER_NAME: ${NGINX_SERVER_NAME:-_}
       NGINX_HTTPS_ENABLED: ${NGINX_HTTPS_ENABLED:-false}
-      NGINX_SSL_PORT: ${NGINX_SSL_PORT:-443}
+      # NGINX_SSL_PORT: ${NGINX_SSL_PORT:-443}
       NGINX_PORT: ${NGINX_PORT:-80}
       # You're required to add your own SSL certificates/keys to the `./nginx/ssl` directory
       # and modify the env vars below in .env if HTTPS_ENABLED is true.
-      NGINX_SSL_CERT_FILENAME: ${NGINX_SSL_CERT_FILENAME:-dify.crt}
-      NGINX_SSL_CERT_KEY_FILENAME: ${NGINX_SSL_CERT_KEY_FILENAME:-dify.key}
-      NGINX_SSL_PROTOCOLS: ${NGINX_SSL_PROTOCOLS:-TLSv1.1 TLSv1.2 TLSv1.3}
+      # NGINX_SSL_CERT_FILENAME: ${NGINX_SSL_CERT_FILENAME:-dify.crt}
+      # NGINX_SSL_CERT_KEY_FILENAME: ${NGINX_SSL_CERT_KEY_FILENAME:-dify.key}
+      # NGINX_SSL_PROTOCOLS: ${NGINX_SSL_PROTOCOLS:-TLSv1.1 TLSv1.2 TLSv1.3}
       NGINX_WORKER_PROCESSES: ${NGINX_WORKER_PROCESSES:-auto}
       NGINX_CLIENT_MAX_BODY_SIZE: ${NGINX_CLIENT_MAX_BODY_SIZE:-15M}
       NGINX_KEEPALIVE_TIMEOUT: ${NGINX_KEEPALIVE_TIMEOUT:-65}
       NGINX_PROXY_READ_TIMEOUT: ${NGINX_PROXY_READ_TIMEOUT:-3600s}
       NGINX_PROXY_SEND_TIMEOUT: ${NGINX_PROXY_SEND_TIMEOUT:-3600s}
-      NGINX_ENABLE_CERTBOT_CHALLENGE: ${NGINX_ENABLE_CERTBOT_CHALLENGE:-false}
-      CERTBOT_DOMAIN: ${CERTBOT_DOMAIN:-}
+      # NGINX_ENABLE_CERTBOT_CHALLENGE: ${NGINX_ENABLE_CERTBOT_CHALLENGE:-false}
+      # CERTBOT_DOMAIN: ${CERTBOT_DOMAIN:-}
     depends_on:
       - api
       - web
     ports:
       - '${EXPOSE_NGINX_PORT:-80}:${NGINX_PORT:-80}'
-      - '${EXPOSE_NGINX_SSL_PORT:-443}:${NGINX_SSL_PORT:-443}'
+      # - '${EXPOSE_NGINX_SSL_PORT:-443}:${NGINX_SSL_PORT:-443}'
 
   # The Weaviate vector store.
   weaviate:
@@ -573,6 +607,8 @@ services:
       POSTGRES_DB: ${PGVECTOR_POSTGRES_DB:-dify}
       # postgres data directory
       PGDATA: ${PGVECTOR_PGDATA:-/var/lib/postgresql/data/pgdata}
+    ports:
+      - "5681:5432"
     volumes:
       - ./volumes/pgvector/data:/var/lib/postgresql/data
     healthcheck:
@@ -847,3 +883,4 @@ networks:
 volumes:
   oradata:
   dify_es01_data:
+  pgadmin_data:
